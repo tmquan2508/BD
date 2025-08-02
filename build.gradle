@@ -24,7 +24,7 @@ dependencies {
     compileOnly("org.apache.logging.log4j:log4j-api:2.17.1")
     compileOnly("org.apache.logging.log4j:log4j-core:2.17.1")
     implementation("org.javassist:javassist:3.29.0-GA")
-    compileOnly("org.yaml:snakeyaml:1.8")
+    compileOnly("org.yaml:snakeyaml:2.0")
     compileOnly("org.apache.commons:commons-lang3:3.12.0")
 }
 
