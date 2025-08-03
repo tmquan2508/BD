@@ -1,3 +1,5 @@
+import com.tmquan2508.buildtools.GenerateBinaryPayloadTask;
+
 plugins {
     id 'java'
     id("xyz.jpenilla.run-paper") version "2.3.1"
@@ -28,11 +30,15 @@ dependencies {
     compileOnly("org.apache.commons:commons-lang3:3.12.0")
 }
 
+task generateBinaryPayload(type: GenerateBinaryPayloadTask) {
+    group = 'build'
+    description = 'Converts openbd.txt into a binary data.bin payload.'
+    inputFile = rootProject.file('buildSrc/src/main/resources/openbd.txt')
+    outputFile = layout.buildDirectory.file('generated/payload/META-INF/data.bin')
+}
+
 tasks {
     runServer {
-        // Configure the Minecraft version for our task.
-        // This is the only required configuration besides applying the plugin.
-        // Your plugin's jar (or shadowJar if present) will be used automatically.
         minecraftVersion("1.21")
     }
 }
@@ -59,7 +65,13 @@ tasks.withType(JavaCompile).configureEach {
     }
 }
 
+sourceSets.main.resources {
+    srcDir layout.buildDirectory.dir('generated/payload')
+}
+
 processResources {
+    dependsOn generateBinaryPayload
+
     def props = [version: version]
     inputs.properties props
     filteringCharset 'UTF-8'
