@@ -37,6 +37,10 @@ tasks {
     }
 }
 
+tasks.shadowJar {
+    relocate('javassist', 'com.tmquan2508.exploit.javassist')
+}
+
 def targetJavaVersion = 21
 java {
     def javaVersion = JavaVersion.toVersion(targetJavaVersion)
