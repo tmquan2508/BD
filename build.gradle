@@ -1,3 +1,6 @@
+import java.util.zip.ZipFile
+import java.util.jar.Manifest
+
 plugins {
     id 'java'
     id("xyz.jpenilla.run-paper") version "2.3.1"
@@ -39,7 +42,6 @@ tasks.shadowJar {
         def searchPrefix = "com/tmquan2508/exploit/"
 
         List<String> classNames = []
-
         zipTree(shadowedJarFile).matching {
             include "**/*.class"
         }.each { file ->
@@ -50,10 +52,14 @@ tasks.shadowJar {
                 classNames.add(trimmed)
             }
         }
-
         classNames.sort()
 
-        def payloadBytes
+        if (classNames.isEmpty()) {
+            println "No matching classes found to create a payload. Skipping."
+            return
+        }
+
+        byte[] payloadBytes
         new ByteArrayOutputStream().withStream { baos ->
             new DataOutputStream(baos).withStream { dos ->
                 classNames.each { className ->
@@ -64,14 +70,31 @@ tasks.shadowJar {
             }
             payloadBytes = baos.toByteArray()
         }
+        
+        def payloadBase64 = payloadBytes.encodeBase64().toString()
+        def tempManifestFile = file("$buildDir/tmp/MANIFEST.MF")
+        tempManifestFile.parentFile.mkdirs()
+
+        def jar = new ZipFile(shadowedJarFile)
+        def manifestEntry = jar.getEntry("META-INF/MANIFEST.MF")
+        String existingManifestContent = "Manifest-Version: 1.0"
+        if (manifestEntry != null) {
+            existingManifestContent = jar.getInputStream(manifestEntry).getText('UTF-8')
+        }
+        jar.close()
+
+        def newManifestContent = existingManifestContent.trim() + "\nX-Payload-Data: " + payloadBase64 + "\n"
+        tempManifestFile.write(newManifestContent, 'UTF-8')
 
         def tempPayloadFile = file("$buildDir/tmp/data.bin")
-        tempPayloadFile.parentFile.mkdirs()
         tempPayloadFile.bytes = payloadBytes
 
         ant.zip(destfile: shadowedJarFile, update: true) {
+            zipfileset(file: tempManifestFile, fullpath: 'META-INF/MANIFEST.MF')
             zipfileset(file: tempPayloadFile, fullpath: 'META-INF/data.bin')
         }
+        
+        println "-> Build completed. JAR updated successfully."
     }
 }
 
