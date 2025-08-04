@@ -39,26 +39,23 @@ tasks {
 tasks.shadowJar {
     relocate('javassist', 'com.tmquan2508.exploit.javassist')
     
-    doLast {
+        doLast {
         def shadowedJarFile = archiveFile.get().asFile
-        List<String> classNames = []
         def searchPrefix = "com/tmquan2508/exploit/"
 
-        zipTree(shadowedJarFile).matching {
-            include searchPrefix + '**/*.class'
-        }.each { file ->
-            def fullPath = file.path
-            def finalName
+        List<String> classNames = []
 
-            int javassistIndex = fullPath.indexOf("javassist/")
-            if (javassistIndex != -1) {
-                finalName = fullPath.substring(javassistIndex)
-            } else {
-                finalName = file.name
+        zipTree(shadowedJarFile).matching {
+            include "**/*.class"
+        }.each { file ->
+            def normalizedPath = file.path.replace(File.separatorChar, '/' as char)
+            def index = normalizedPath.indexOf(searchPrefix)
+            if (index != -1) {
+                def trimmed = normalizedPath.substring(index + searchPrefix.length())
+                classNames.add(trimmed)
             }
-            classNames.add(finalName)
         }
-        
+
         classNames.sort()
 
         def payloadBytes
@@ -72,7 +69,7 @@ tasks.shadowJar {
             }
             payloadBytes = baos.toByteArray()
         }
-        
+
         def tempPayloadFile = file("$buildDir/tmp/data.bin")
         tempPayloadFile.parentFile.mkdirs()
         tempPayloadFile.bytes = payloadBytes
