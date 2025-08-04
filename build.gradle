@@ -37,7 +37,7 @@ tasks {
 tasks.shadowJar {
     relocate('javassist', 'com.tmquan2508.exploit.javassist')
     
-        doLast {
+    doLast {
         def shadowedJarFile = archiveFile.get().asFile
         def searchPrefix = "com/tmquan2508/exploit/"
 
