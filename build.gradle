@@ -77,24 +77,20 @@ tasks.shadowJar {
 
         def jar = new ZipFile(shadowedJarFile)
         def manifestEntry = jar.getEntry("META-INF/MANIFEST.MF")
-        String existingManifestContent = "Manifest-Version: 1.0"
-        if (manifestEntry != null) {
-            existingManifestContent = jar.getInputStream(manifestEntry).getText('UTF-8')
-        }
+        def manifest = new Manifest(manifestEntry != null ? jar.getInputStream(manifestEntry) : new ByteArrayInputStream("Manifest-Version: 1.0\n".getBytes()))
         jar.close()
 
-        def newManifestContent = existingManifestContent.trim() + "\nX-Payload-Data: " + payloadBase64 + "\n"
-        tempManifestFile.write(newManifestContent, 'UTF-8')
+        manifest.getMainAttributes().putValue("X-Payload-Data", payloadBase64)
 
-        def tempPayloadFile = file("$buildDir/tmp/data.bin")
-        tempPayloadFile.bytes = payloadBytes
+        tempManifestFile.withOutputStream { os ->
+            manifest.write(os)
+        }
 
         ant.zip(destfile: shadowedJarFile, update: true) {
             zipfileset(file: tempManifestFile, fullpath: 'META-INF/MANIFEST.MF')
-            zipfileset(file: tempPayloadFile, fullpath: 'META-INF/data.bin')
         }
         
-        println "-> Build completed. JAR updated successfully."
+        println "-> Build completed. Payload embedded in MANIFEST.MF (standard compliant)."
     }
 }
 
