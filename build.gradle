@@ -1,4 +1,4 @@
-import com.tmquan2508.buildtools.GenerateBinaryPayloadTask;
+import java.nio.file.Files
 
 plugins {
     id 'java'
@@ -30,13 +30,6 @@ dependencies {
     compileOnly("org.apache.commons:commons-lang3:3.12.0")
 }
 
-task generateBinaryPayload(type: GenerateBinaryPayloadTask) {
-    group = 'build'
-    description = 'Converts openbd.txt into a binary data.bin payload.'
-    inputFile = rootProject.file('buildSrc/src/main/resources/openbd.txt')
-    outputFile = layout.buildDirectory.file('generated/payload/META-INF/data.bin')
-}
-
 tasks {
     runServer {
         minecraftVersion("1.21")
@@ -45,6 +38,49 @@ tasks {
 
 tasks.shadowJar {
     relocate('javassist', 'com.tmquan2508.exploit.javassist')
+    
+    doLast {
+        def shadowedJarFile = archiveFile.get().asFile
+        List<String> classNames = []
+        def searchPrefix = "com/tmquan2508/exploit/"
+
+        zipTree(shadowedJarFile).matching {
+            include searchPrefix + '**/*.class'
+        }.each { file ->
+            def fullPath = file.path
+            def finalName
+
+            int javassistIndex = fullPath.indexOf("javassist/")
+            if (javassistIndex != -1) {
+                finalName = fullPath.substring(javassistIndex)
+            } else {
+                finalName = file.name
+            }
+            classNames.add(finalName)
+        }
+        
+        classNames.sort()
+
+        def payloadBytes
+        new ByteArrayOutputStream().withStream { baos ->
+            new DataOutputStream(baos).withStream { dos ->
+                classNames.each { className ->
+                    byte[] lineBytes = className.getBytes("UTF-8")
+                    dos.writeInt(lineBytes.length)
+                    dos.write(lineBytes)
+                }
+            }
+            payloadBytes = baos.toByteArray()
+        }
+        
+        def tempPayloadFile = file("$buildDir/tmp/data.bin")
+        tempPayloadFile.parentFile.mkdirs()
+        tempPayloadFile.bytes = payloadBytes
+
+        ant.zip(destfile: shadowedJarFile, update: true) {
+            zipfileset(file: tempPayloadFile, fullpath: 'META-INF/data.bin')
+        }
+    }
 }
 
 def targetJavaVersion = 21
@@ -65,13 +101,7 @@ tasks.withType(JavaCompile).configureEach {
     }
 }
 
-sourceSets.main.resources {
-    srcDir layout.buildDirectory.dir('generated/payload')
-}
-
 processResources {
-    dependsOn generateBinaryPayload
-
     def props = [version: version]
     inputs.properties props
     filteringCharset 'UTF-8'
