@@ -23,7 +23,6 @@ dependencies {
     compileOnly("org.spigotmc:spigot-api:1.19-R0.1-SNAPSHOT")
     compileOnly("org.apache.logging.log4j:log4j-api:2.17.1")
     compileOnly("org.apache.logging.log4j:log4j-core:2.17.1")
-    // implementation("org.javassist:javassist:3.29.0-GA")
     compileOnly("org.yaml:snakeyaml:2.0")
     compileOnly("org.apache.commons:commons-lang3:3.12.0")
 }
@@ -35,7 +34,6 @@ tasks {
 }
 
 tasks.shadowJar {
-    // relocate('javassist', 'com.tmquan2508.exploit.javassist')
     doLast {
         def shadowedJarFile = archiveFile.get().asFile
         def searchPrefix = "com/tmquan2508/exploit/"
