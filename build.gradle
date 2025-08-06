@@ -1,3 +1,5 @@
+import com.tmquan2508.gradle.InjectClassList
+
 plugins {
     id 'java'
     id("xyz.jpenilla.run-paper") version "2.3.1"
@@ -53,17 +55,25 @@ processResources {
     }
 }
 
-apply from: 'gradle/inject-task.gradle'
 apply from: 'gradle/comment-task.gradle'
-
-tasks.named('jar') {
-    dependsOn(tasks.named('injectClassList'))
+tasks.register('injectClassList', InjectClassList) {
+    dependsOn tasks.named('classes')
+    def classesOutput = sourceSets.main.output.classesDirs.singleFile
+    classesDir.set(classesOutput)
+    outputClassesDir.set(classesOutput)
+    searchPrefix.set("com/tmquan2508/exploit/")
+    configClassName.set("com.tmquan2508.exploit.Config")
+    placeholder.set("::CLASSLIST::")
 }
 
 tasks {
     runServer {
         minecraftVersion("1.21")
     }
+}
+
+tasks.named('jar') {
+    dependsOn(tasks.named('injectClassList'))
 }
 
 tasks.shadowJar {
