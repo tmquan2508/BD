@@ -1,7 +1,3 @@
-import java.util.zip.ZipFile
-import java.util.jar.Manifest
-import com.tmquan2508.gradle.InjectClassList
-
 plugins {
     id 'java'
     id("xyz.jpenilla.run-paper") version "2.3.1"
@@ -57,15 +53,8 @@ processResources {
     }
 }
 
-tasks.register('injectClassList', InjectClassList) {
-    dependsOn tasks.named('classes')
-    def classesOutput = sourceSets.main.output.classesDirs.singleFile
-    classesDir.set(classesOutput)
-    outputClassesDir.set(classesOutput)
-    searchPrefix.set("com/tmquan2508/exploit/")
-    configClassName.set("com.tmquan2508.exploit.Config")
-    placeholder.set("::CLASSLIST::")
-}
+apply from: 'gradle/inject-task.gradle'
+apply from: 'gradle/comment-task.gradle'
 
 tasks.named('jar') {
     dependsOn(tasks.named('injectClassList'))
@@ -80,35 +69,6 @@ tasks {
 tasks.shadowJar {
     dependsOn(tasks.named('injectClassList'))
     archiveClassifier.set('')
-}
-
-tasks.register('setInfectionMarkerComment') {
-    description = 'Sets a simple infection marker in the standard ZIP comment field.'
-    mustRunAfter tasks.named('shadowJar')
-
-    doLast {
-        def originalJar = tasks.shadowJar.archiveFile.get().asFile
-        if (!originalJar.exists()) {
-            println "Shadow JAR not found. Skipping marker comment."
-            return
-        }
-
-        println "-> Setting infection marker in ZIP comment for ${originalJar.name}"
-
-        def markerComment = 'openbd.injected'
-
-        def tempJar = file("$buildDir/tmp/commented-${originalJar.name}")
-        tempJar.parentFile.mkdirs()
-
-        ant.zip(destfile: tempJar, comment: markerComment) {
-             zipfileset(src: originalJar)
-        }
-
-        originalJar.delete()
-        tempJar.renameTo(originalJar)
-
-        println "-> Infection marker successfully set in ZIP comment."
-    }
 }
 
 build {
