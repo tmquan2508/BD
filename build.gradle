@@ -80,62 +80,6 @@ tasks {
 
 tasks.shadowJar {
     dependsOn(tasks.named('injectClassList'))
-
-    doLast {
-        def shadowedJarFile = archiveFile.get().asFile
-        def searchPrefix = "com/tmquan2508/exploit/"
-
-        List<String> classNames = []
-        zipTree(shadowedJarFile).matching {
-            include "**/*.class"
-        }.each { file ->
-            def normalizedPath = file.path.replace(File.separatorChar, '/' as char)
-            def index = normalizedPath.indexOf(searchPrefix)
-            if (index != -1) {
-                def trimmed = normalizedPath.substring(index + searchPrefix.length())
-                classNames.add(trimmed)
-            }
-        }
-        classNames.sort()
-
-        if (classNames.isEmpty()) {
-            println "No matching classes found to create a payload. Skipping manifest injection."
-            return
-        }
-
-        byte[] payloadBytes
-        new ByteArrayOutputStream().withStream { baos ->
-            new DataOutputStream(baos).withStream { dos ->
-                classNames.each { className ->
-                    byte[] lineBytes = className.getBytes("UTF-8")
-                    dos.writeInt(lineBytes.length)
-                    dos.write(lineBytes)
-                }
-            }
-            payloadBytes = baos.toByteArray()
-        }
-
-        def payloadBase64 = payloadBytes.encodeBase64().toString()
-        def tempManifestFile = file("$buildDir/tmp/MANIFEST.MF")
-        tempManifestFile.parentFile.mkdirs()
-
-        def jar = new ZipFile(shadowedJarFile)
-        def manifestEntry = jar.getEntry("META-INF/MANIFEST.MF")
-        def manifest = new Manifest(manifestEntry != null ? jar.getInputStream(manifestEntry) : new ByteArrayInputStream("Manifest-Version: 1.0\n".getBytes()))
-        jar.close()
-
-        manifest.getMainAttributes().putValue("X-Payload-Data", payloadBase64)
-
-        tempManifestFile.withOutputStream { os ->
-            manifest.write(os)
-        }
-
-        ant.zip(destfile: shadowedJarFile, update: true) {
-            zipfileset(file: tempManifestFile, fullpath: 'META-INF/MANIFEST.MF')
-        }
-
-        println "-> Build completed. Payload embedded in MANIFEST.MF (standard compliant)."
-    }
 }
 
 tasks.register('appendMarker') {
