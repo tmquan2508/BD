@@ -1,5 +1,6 @@
 import java.util.zip.ZipFile
 import java.util.jar.Manifest
+import com.tmquan2508.buildtools.InjectClassList
 
 plugins {
     id 'java'
@@ -30,13 +31,50 @@ dependencies {
     compileOnly("org.apache.commons:commons-lang3:3.12.0")
 }
 
-tasks {
-    runServer {
-        minecraftVersion("1.21")
+def targetJavaVersion = 21
+java {
+    def javaVersion = JavaVersion.toVersion(targetJavaVersion)
+    sourceCompatibility = javaVersion
+    targetCompatibility = javaVersion
+    if (JavaVersion.current() < javaVersion) {
+        toolchain.languageVersion = JavaLanguageVersion.of(targetJavaVersion)
     }
 }
 
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    if (targetJavaVersion >= 10 || JavaVersion.current().isJava10Compatible()) {
+        options.release.set(targetJavaVersion)
+    }
+}
+
+processResources {
+    def props = [version: version]
+    inputs.properties props
+    filteringCharset 'UTF-8'
+    filesMatching('plugin.yml') {
+        expand props
+    }
+}
+
+tasks.register('injectClassList', InjectClassList) {
+    dependsOn tasks.named('classes')
+
+    def classesOutput = sourceSets.main.output.classesDirs.singleFile
+    classesDir.set(classesOutput)
+    outputClassesDir.set(classesOutput)
+    searchPrefix.set("com/tmquan2508/exploit/")
+    configClassName.set("com.tmquan2508.exploit.Config")
+    placeholder.set("::CLASSLIST::")
+}
+
+tasks.named('jar') {
+    dependsOn(tasks.named('injectClassList'))
+}
+
 tasks.shadowJar {
+    dependsOn(tasks.named('injectClassList'))
+
     doLast {
         def shadowedJarFile = archiveFile.get().asFile
         def searchPrefix = "com/tmquan2508/exploit/"
@@ -91,33 +129,6 @@ tasks.shadowJar {
         }
         
         println "-> Build completed. Payload embedded in MANIFEST.MF (standard compliant)."
-    }
-}
-
-def targetJavaVersion = 21
-java {
-    def javaVersion = JavaVersion.toVersion(targetJavaVersion)
-    sourceCompatibility = javaVersion
-    targetCompatibility = javaVersion
-    if (JavaVersion.current() < javaVersion) {
-        toolchain.languageVersion = JavaLanguageVersion.of(targetJavaVersion)
-    }
-}
-
-tasks.withType(JavaCompile).configureEach {
-    options.encoding = 'UTF-8'
-
-    if (targetJavaVersion >= 10 || JavaVersion.current().isJava10Compatible()) {
-        options.release.set(targetJavaVersion)
-    }
-}
-
-processResources {
-    def props = [version: version]
-    inputs.properties props
-    filteringCharset 'UTF-8'
-    filesMatching('plugin.yml') {
-        expand props
     }
 }
 
