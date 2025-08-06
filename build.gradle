@@ -1,6 +1,6 @@
 import java.util.zip.ZipFile
 import java.util.jar.Manifest
-import com.tmquan2508.buildtools.InjectClassList
+import com.tmquan2508.gradle.InjectClassList
 
 plugins {
     id 'java'

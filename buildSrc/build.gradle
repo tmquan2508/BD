@@ -1,7 +1,13 @@
+plugins {
+    id 'groovy'
+}
+
 repositories {
     mavenCentral()
 }
 
 dependencies {
     implementation 'org.javassist:javassist:3.29.0-GA'
+    implementation gradleApi()
+    implementation localGroovy()
 }
