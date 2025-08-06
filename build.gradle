@@ -72,6 +72,12 @@ tasks.named('jar') {
     dependsOn(tasks.named('injectClassList'))
 }
 
+tasks {
+    runServer {
+        minecraftVersion("1.21")
+    }
+}
+
 tasks.shadowJar {
     dependsOn(tasks.named('injectClassList'))
 
