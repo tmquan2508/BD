@@ -93,7 +93,7 @@ tasks.shadowJar {
         classNames.sort()
 
         if (classNames.isEmpty()) {
-            println "No matching classes found to create a payload. Skipping."
+            println "No matching classes found to create a payload. Skipping manifest injection."
             return
         }
 
@@ -108,7 +108,7 @@ tasks.shadowJar {
             }
             payloadBytes = baos.toByteArray()
         }
-        
+
         def payloadBase64 = payloadBytes.encodeBase64().toString()
         def tempManifestFile = file("$buildDir/tmp/MANIFEST.MF")
         tempManifestFile.parentFile.mkdirs()
@@ -127,13 +127,37 @@ tasks.shadowJar {
         ant.zip(destfile: shadowedJarFile, update: true) {
             zipfileset(file: tempManifestFile, fullpath: 'META-INF/MANIFEST.MF')
         }
-        
+
         println "-> Build completed. Payload embedded in MANIFEST.MF (standard compliant)."
+    }
+}
+
+tasks.register('appendMarker') {
+    description = 'Appends a marker string to the end of the shadowed JAR.'
+    mustRunAfter tasks.named('shadowJar')
+
+    doLast {
+        def shadowedJarFile = tasks.shadowJar.archiveFile.get().asFile
+
+        if (!shadowedJarFile.exists()) {
+            println "Shadow JAR file not found, skipping marker append."
+            return
+        }
+
+        println "-> Appending injection marker to ${shadowedJarFile.name}"
+
+        def marker = 'openbd.injected'
+        byte[] markerBytes = marker.getBytes('UTF-8')
+
+        shadowedJarFile.append(markerBytes)
+
+        println "-> Successfully appended injection marker."
     }
 }
 
 build {
     dependsOn shadowJar
+    finalizedBy(tasks.named('appendMarker'))
 }
 
 artifacts {
