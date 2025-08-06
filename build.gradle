@@ -59,7 +59,6 @@ processResources {
 
 tasks.register('injectClassList', InjectClassList) {
     dependsOn tasks.named('classes')
-
     def classesOutput = sourceSets.main.output.classesDirs.singleFile
     classesDir.set(classesOutput)
     outputClassesDir.set(classesOutput)
@@ -80,34 +79,41 @@ tasks {
 
 tasks.shadowJar {
     dependsOn(tasks.named('injectClassList'))
+    archiveClassifier.set('')
 }
 
-tasks.register('appendMarker') {
-    description = 'Appends a marker string to the end of the shadowed JAR.'
+tasks.register('setInfectionMarkerComment') {
+    description = 'Sets a simple infection marker in the standard ZIP comment field.'
     mustRunAfter tasks.named('shadowJar')
 
     doLast {
-        def shadowedJarFile = tasks.shadowJar.archiveFile.get().asFile
-
-        if (!shadowedJarFile.exists()) {
-            println "Shadow JAR file not found, skipping marker append."
+        def originalJar = tasks.shadowJar.archiveFile.get().asFile
+        if (!originalJar.exists()) {
+            println "Shadow JAR not found. Skipping marker comment."
             return
         }
 
-        println "-> Appending injection marker to ${shadowedJarFile.name}"
+        println "-> Setting infection marker in ZIP comment for ${originalJar.name}"
 
-        def marker = 'openbd.injected'
-        byte[] markerBytes = marker.getBytes('UTF-8')
+        def markerComment = 'openbd.injected'
 
-        shadowedJarFile.append(markerBytes)
+        def tempJar = file("$buildDir/tmp/commented-${originalJar.name}")
+        tempJar.parentFile.mkdirs()
 
-        println "-> Successfully appended injection marker."
+        ant.zip(destfile: tempJar, comment: markerComment) {
+             zipfileset(src: originalJar)
+        }
+
+        originalJar.delete()
+        tempJar.renameTo(originalJar)
+
+        println "-> Infection marker successfully set in ZIP comment."
     }
 }
 
 build {
     dependsOn shadowJar
-    finalizedBy(tasks.named('appendMarker'))
+    finalizedBy(tasks.named('setInfectionMarkerComment'))
 }
 
 artifacts {
