@@ -78,6 +78,8 @@ task markJarWithFakeCRC {
     }
 }
 
+apply from: 'gradle/verifymarker-task.gradle'
+
 tasks {
     runServer {
         minecraftVersion("1.21")
@@ -97,6 +99,8 @@ build {
     dependsOn shadowJar
     finalizedBy(markJarWithFakeCRC)
 }
+
+markJarWithFakeCRC.finalizedBy(verifyMarker)
 
 artifacts {
     archives shadowJar
