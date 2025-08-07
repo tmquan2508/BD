@@ -1,5 +1,5 @@
 import com.tmquan2508.gradle.InjectClassList
-import com.tmquan2508.buildtools.FakeCrcMarker
+import com.tmquan2508.gradle.FakeCrcMarker
 
 plugins {
     id 'java'
