@@ -28,7 +28,6 @@ dependencies {
     compileOnly("org.apache.logging.log4j:log4j-core:2.17.1")
     compileOnly("org.yaml:snakeyaml:2.0")
     compileOnly("org.apache.commons:commons-lang3:3.12.0")
-    implementation("net.bytebuddy:byte-buddy:1.14.17")
 }
 
 def targetJavaVersion = 21
