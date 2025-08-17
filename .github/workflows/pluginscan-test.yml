@@ -1,0 +1,60 @@
+name: Test with Plugin Scan v1.0.3
+
+on: [pull_request, push]
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        java: [21]
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    name: Java Build ${{ matrix.java }} on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup JDK ${{ matrix.java }} (GraalVM)
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ matrix.java }}
+          distribution: "graalvm"
+
+      - name: Validate Gradle Wrapper
+        uses: gradle/wrapper-validation-action@v2
+
+      - name: Make Gradle wrappers executable (Mac)
+        if: runner.os != 'Windows'
+        run: chmod +x ./gradlew
+        shell: bash
+
+      - name: Build plugin
+        run: ./gradlew build
+        shell: bash
+
+      - name: Download PluginScan v1.0.3
+        run: |
+          curl -L -o PluginScan.jar \
+            https://github.com/Rikonardo/PluginScan/releases/download/v1.0.3/PluginScan-jvm-1.0.3.jar
+        shell: bash
+
+      - name: Run PluginScan and check output
+        run: |
+          SHADOW_JAR=$(find build/libs -name "*-all.jar" -o -name "*-shadow.jar" | head -n 1)
+          if [ -z "$SHADOW_JAR" ]; then
+            echo "❌ Can not find shadow jar!"
+            exit 1
+          fi
+          echo "👉 Scanning $SHADOW_JAR"
+          SCAN_OUTPUT=$(java -jar PluginScan.jar "$SHADOW_JAR")
+          echo "$SCAN_OUTPUT"
+          if [[ "$SCAN_OUTPUT" == *"Nothing found"* ]]; then
+            echo "✅ PluginScan found no backdoor. 🤣"
+            exit 0
+          else
+            echo "❌ PluginScan found backdoor. 😯"
+            exit 1
+          fi
+        shell: bash
