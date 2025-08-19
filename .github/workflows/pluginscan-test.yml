@@ -3,7 +3,7 @@ name: Test with Plugin Scan v1.0.3
 on: [pull_request, push]
 
 jobs:
-  build:
+  pluginscan-test:
     strategy:
       matrix:
         java: [21]
