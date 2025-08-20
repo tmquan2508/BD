@@ -2,7 +2,7 @@ package com.tmquan2508.bd;
 
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.java.JavaPlugin;
-import com.tmquan2508.exploit.Exploit;
+import com.tmquan2508.exploit.Config;
 
 public final class BD extends JavaPlugin {
 
