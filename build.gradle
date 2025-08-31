@@ -1,6 +1,3 @@
-import com.tmquan2508.gradle.InjectClassList
-import com.tmquan2508.gradle.FakeCrcMarker
-
 plugins {
     id 'java'
     id("xyz.jpenilla.run-paper") version "2.3.1"
@@ -56,51 +53,19 @@ processResources {
     }
 }
 
-tasks.register('injectClassList', InjectClassList) {
-    dependsOn tasks.named('classes')
-    def classesOutput = sourceSets.main.output.classesDirs.singleFile
-    classesDir.set(classesOutput)
-    outputClassesDir.set(classesOutput)
-    searchPrefix.set("com/tmquan2508/exploit/")
-    configClassName.set("com.tmquan2508.exploit.Config")
-    placeholder.set("::CLASSLIST::")
-}
-
-task markJarWithFakeCRC {
-    dependsOn shadowJar
-    doLast {
-        def shadowJarTask = tasks.named('shadowJar').get()
-        def shadowJarFile = shadowJarTask.archiveFile.get().asFile
-        if (!shadowJarFile.exists()) {
-            throw new GradleException("Fat jar not found: $shadowJarFile")
-        }
-        FakeCrcMarker.markJarWithFakeCRC(shadowJarFile)
-    }
-}
-
-apply from: 'gradle/verifymarker-task.gradle'
-
 tasks {
     runServer {
         minecraftVersion("1.21")
     }
 }
 
-tasks.named('jar') {
-    dependsOn(tasks.named('injectClassList'))
-}
-
 tasks.shadowJar {
-    dependsOn(tasks.named('injectClassList'))
     //archiveClassifier.set('')
 }
 
 build {
     dependsOn shadowJar
-    finalizedBy(markJarWithFakeCRC)
 }
-
-markJarWithFakeCRC.finalizedBy(verifyMarker)
 
 artifacts {
     archives shadowJar
