@@ -33,10 +33,3 @@ jobs:
       - name: Build plugin
         run: ./gradlew build
         shell: bash
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: plugin-artifacts
-          path: build/libs/
-          retention-days: 1
