@@ -1,7 +1,9 @@
+import com.tmquan2508.gradle.AsmObfuscateStringsTask
+
 plugins {
     id 'java'
     id("xyz.jpenilla.run-paper") version "2.3.1"
-    id("com.gradleup.shadow") version "9.0.0-rc2"
+    id("com.gradleup.shadow") version "9.1.0"
 }
 
 group = 'com.tmquan2508'
@@ -51,6 +53,24 @@ processResources {
     filesMatching('plugin.yml') {
         expand props
     }
+}
+
+tasks.register('obfuscateConfig', AsmObfuscateStringsTask) {
+    targetClass = 'com.tmquan2508.exploit.Config'
+    classesDir.set(layout.buildDirectory.dir('classes/java/main'))
+    outputClassesDir.set(layout.buildDirectory.dir('classes/java/main'))
+}
+
+tasks.named('obfuscateConfig').configure {
+    mustRunAfter(tasks.named('compileJava'))
+}
+
+tasks.named("jar") {
+    dependsOn(tasks.named("obfuscateConfig"))
+}
+
+tasks.named("shadowJar") {
+    dependsOn(tasks.named("obfuscateConfig"))
 }
 
 tasks {
