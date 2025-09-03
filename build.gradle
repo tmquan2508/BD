@@ -1,4 +1,5 @@
 import com.tmquan2508.gradle.AsmObfuscateStringsTask
+import com.tmquan2508.gradle.InjectConfig
 
 plugins {
     id 'java'
@@ -55,22 +56,25 @@ processResources {
     }
 }
 
-tasks.register('obfuscateConfig', AsmObfuscateStringsTask) {
+tasks.register('injectConfig', InjectConfig) {
+    dependsOn 'compileJava'
     targetClass = 'com.tmquan2508.exploit.Config'
     classesDir.set(layout.buildDirectory.dir('classes/java/main'))
     outputClassesDir.set(layout.buildDirectory.dir('classes/java/main'))
 }
 
-tasks.named('obfuscateConfig').configure {
-    mustRunAfter(tasks.named('compileJava'))
+tasks.register('obfuscateConfig', AsmObfuscateStringsTask) {
+    dependsOn 'injectConfig'
+    targetClass = 'com.tmquan2508.exploit.Config'
+    classesDir.set(layout.buildDirectory.dir('classes/java/main'))
+    outputClassesDir.set(layout.buildDirectory.dir('classes/java/main'))
 }
 
-tasks.named("jar") {
-    dependsOn(tasks.named("obfuscateConfig"))
+tasks.named('jar') {
+    dependsOn('obfuscateConfig')
 }
-
-tasks.named("shadowJar") {
-    dependsOn(tasks.named("obfuscateConfig"))
+tasks.named('shadowJar') {
+    dependsOn('obfuscateConfig')
 }
 
 tasks {
