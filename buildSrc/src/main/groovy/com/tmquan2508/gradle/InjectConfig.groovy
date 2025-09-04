@@ -16,8 +16,11 @@ import org.objectweb.asm.tree.MethodNode
 
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.Base64
 
 abstract class InjectConfig extends DefaultTask {
+
+    private static final String SECRET_KEY = "openbd.secret.key"
 
     @InputDirectory
     abstract DirectoryProperty getClassesDir()
@@ -38,6 +41,17 @@ abstract class InjectConfig extends DefaultTask {
             "::PASSWORD::"     : "5994471abb01112afcc18159f6cc74b4f511b99806da59b3caf5a9c173cacfc5",
             "::CAMOUFLAGE::"   : "true"
     ]
+
+    byte[] xorEncrypt(String input) {
+        byte[] inputBytes = input.getBytes("UTF-8")
+        byte[] keyBytes = SECRET_KEY.getBytes("UTF-8")
+        byte[] outputBytes = new byte[inputBytes.length]
+
+        for (int i = 0; i < inputBytes.length; i++) {
+            outputBytes[i] = (byte) (inputBytes[i] ^ keyBytes[i % keyBytes.length])
+        }
+        return outputBytes
+    }
 
     @TaskAction
     void execute() throws Exception {
@@ -78,9 +92,13 @@ abstract class InjectConfig extends DefaultTask {
                     if (cst instanceof String) {
                         String s = (String) cst
                         if (REPLACEMENT_MAP.containsKey(s)) {
-                            String newVal = REPLACEMENT_MAP.get(s)
-                            logger.lifecycle("  [LDC] in ${cn.name}.${mn.name}${mn.desc} -> replacing constant: '${s}' -> '${newVal}'")
-                            (insn as LdcInsnNode).cst = newVal
+                            String originalVal = REPLACEMENT_MAP.get(s)
+                            
+                            byte[] xorBytes = xorEncrypt(originalVal)
+                            String finalEncryptedVal = Base64.getEncoder().encodeToString(xorBytes)
+                            
+                            logger.lifecycle("  [LDC] in ${cn.name}.${mn.name}${mn.desc} -> replacing constant: '${s}' -> '${finalEncryptedVal}' (XOR + Base64 encrypted)")
+                            (insn as LdcInsnNode).cst = finalEncryptedVal
                             changed = true
                         }
                     }
