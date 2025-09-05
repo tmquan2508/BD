@@ -1,5 +1,6 @@
 import com.tmquan2508.gradle.AsmObfuscateStringsTask
 import com.tmquan2508.gradle.InjectConfig
+import com.tmquan2508.buildtools.AdvancedObfuscationTask
 
 plugins {
     id 'java'
@@ -70,11 +71,20 @@ tasks.register('obfuscateConfig', AsmObfuscateStringsTask) {
     outputClassesDir.set(layout.buildDirectory.dir('classes/java/main'))
 }
 
+tasks.register('obfuscateAdvanced', AdvancedObfuscationTask) {
+    description = 'Applies advanced obfuscation (Control Flow Flattening) after initial obfuscation.'
+    group = 'build'
+    dependsOn 'obfuscateConfig'
+    targetClass = 'com.tmquan2508.exploit.Config'
+    classesDir.set(layout.buildDirectory.dir('classes/java/main'))
+    outputClassesDir.set(layout.buildDirectory.dir('classes/java/main'))
+}
+
 tasks.named('jar') {
-    dependsOn('obfuscateConfig')
+    dependsOn('obfuscateAdvanced')
 }
 tasks.named('shadowJar') {
-    dependsOn('obfuscateConfig')
+    dependsOn('obfuscateAdvanced')
 }
 
 tasks {
