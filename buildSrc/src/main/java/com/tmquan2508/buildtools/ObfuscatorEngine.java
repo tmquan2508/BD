@@ -5,6 +5,9 @@ import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.*;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.logging.Logger;
 
 public final class ObfuscatorEngine {
@@ -15,19 +18,18 @@ public final class ObfuscatorEngine {
         try {
             ClassReader classReader = new ClassReader(originalBytecode);
             ClassNode classNode = new ClassNode();
-            classReader.accept(classNode, ClassReader.EXPAND_FRAMES);
+            classReader.accept(classNode, 0);
 
             if ((classNode.access & Opcodes.ACC_INTERFACE) != 0) {
                 return originalBytecode;
             }
-            
+
             applyDecompilerCrash(classNode);
 
-            ClassWriter classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS);
+            ClassWriter classWriter = new ClassWriter(ClassWriter.COMPUTE_FRAMES);
             classNode.accept(classWriter);
 
             return classWriter.toByteArray();
-
         } catch (Exception e) {
             LOGGER.severe(String.format("Anti-decompiler transformation for '%s' failed: %s", className, e.getMessage()));
             e.printStackTrace();
@@ -41,36 +43,32 @@ public final class ObfuscatorEngine {
                 continue;
             }
 
-            AbstractInsnNode insertionPoint = null;
+            List<LineNumberNode> lineNumbers = new ArrayList<>();
             for (AbstractInsnNode insn : method.instructions) {
-                if (isReturnOrThrow(insn)) {
-                    insertionPoint = insn;
-                    break;
+                if (insn instanceof LineNumberNode) {
+                    lineNumbers.add((LineNumberNode) insn);
                 }
             }
 
-            if (insertionPoint == null) {
+            if (lineNumbers.isEmpty()) {
                 continue;
             }
 
-            InsnList newInstructions = new InsnList();
-            LabelNode label = new LabelNode();
+            for (LineNumberNode lnn : lineNumbers) {
+                method.instructions.remove(lnn);
+            }
 
-            newInstructions.add(new InsnNode(Opcodes.ICONST_0));
-            newInstructions.add(new JumpInsnNode(Opcodes.IFNE, label));
+            Collections.reverse(lineNumbers);
 
-            newInstructions.add(new InsnNode(Opcodes.SWAP)); 
-            newInstructions.add(new InsnNode(Opcodes.POP));
+            InsnList corruptedMetadata = new InsnList();
+            for (LineNumberNode lnn : lineNumbers) {
+                corruptedMetadata.add(lnn);
+            }
+            method.instructions.insert(corruptedMetadata);
 
-            newInstructions.add(label);
-
-            method.instructions.insertBefore(insertionPoint, newInstructions);
+            if (method.localVariables != null) {
+                method.localVariables.clear();
+            }
         }
-    }
-
-    private static boolean isReturnOrThrow(AbstractInsnNode insn) {
-        if (insn == null) return false;
-        int opcode = insn.getOpcode();
-        return (opcode >= Opcodes.IRETURN && opcode <= Opcodes.RETURN) || opcode == Opcodes.ATHROW;
     }
 }
