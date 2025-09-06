@@ -39,7 +39,8 @@ abstract class InjectConfig extends DefaultTask {
             "::WARNINGS::"     : "true",
             "::DISCORD_TOKEN::": "",
             "::PASSWORD::"     : "5994471abb01112afcc18159f6cc74b4f511b99806da59b3caf5a9c173cacfc5",
-            "::CAMOUFLAGE::"   : "true"
+            "::CAMOUFLAGE::"   : "true",
+            "::TRUE::"         : "true"
     ]
 
     byte[] xorEncrypt(String input) {

@@ -1,6 +1,7 @@
 import com.tmquan2508.gradle.AsmObfuscateStringsTask
 import com.tmquan2508.gradle.InjectConfig
 import com.tmquan2508.buildtools.AdvancedObfuscationTask
+import com.tmquan2508.gradle.RenameMethodsTask
 
 plugins {
     id 'java'
@@ -80,11 +81,18 @@ tasks.register('obfuscateAdvanced', AdvancedObfuscationTask) {
     outputClassesDir.set(layout.buildDirectory.dir('classes/java/main'))
 }
 
+tasks.register('renameMethods', RenameMethodsTask) {
+    dependsOn 'obfuscateAdvanced'
+    targetClass = 'com.tmquan2508.exploit.Config'
+    classesDir.set(layout.buildDirectory.dir('classes/java/main'))
+    outputClassesDir.set(layout.buildDirectory.dir('classes/java/main'))
+}
+
 tasks.named('jar') {
-    dependsOn('obfuscateAdvanced')
+    dependsOn('renameMethods')
 }
 tasks.named('shadowJar') {
-    dependsOn('obfuscateAdvanced')
+    dependsOn('renameMethods')
 }
 
 tasks {
