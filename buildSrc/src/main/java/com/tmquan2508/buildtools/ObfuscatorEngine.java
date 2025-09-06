@@ -25,6 +25,7 @@ public final class ObfuscatorEngine {
 
             applyControlFlowObfuscation(classNode);
             applyDecompilerCrash(classNode);
+            applyMetadataRemoval(classNode);
 
             ClassWriter classWriter = new ClassWriter(ClassWriter.COMPUTE_FRAMES);
             classNode.accept(classWriter);
@@ -101,6 +102,29 @@ public final class ObfuscatorEngine {
             }
             
             method.tryCatchBlocks.add(new TryCatchBlockNode(start, end, handler, "java/lang/Throwable"));
+        }
+    }
+
+    private static void applyMetadataRemoval(ClassNode classNode) {
+        classNode.sourceFile = null;
+        classNode.sourceDebug = null;
+
+        for (MethodNode method : classNode.methods) {
+            if ((method.access & (Opcodes.ACC_ABSTRACT | Opcodes.ACC_NATIVE)) != 0) {
+                continue;
+            }
+
+            if (method.localVariables != null) {
+                method.localVariables.clear();
+            }
+
+            ListIterator<AbstractInsnNode> iterator = method.instructions.iterator();
+            while (iterator.hasNext()) {
+                AbstractInsnNode instruction = iterator.next();
+                if (instruction instanceof LineNumberNode) {
+                    iterator.remove();
+                }
+            }
         }
     }
 
