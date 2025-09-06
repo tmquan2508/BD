@@ -32,7 +32,7 @@ public final class ObfuscatorEngine {
 
             return classWriter.toByteArray();
         } catch (Exception e) {
-            LOGGER.severe(String.format("Advanced transformation for '%s' failed: %s", className, e.toString()));
+            LOGGER.severe(String.format("Layered transformation for '%s' failed: %s", className, e.toString()));
             e.printStackTrace();
             return originalBytecode;
         }
@@ -46,7 +46,7 @@ public final class ObfuscatorEngine {
                 continue;
             }
 
-            AbstractInsnNode insertionPoint = findSafeInsertionPoint(method);
+            AbstractInsnNode insertionPoint = method.instructions.getFirst();
             if (insertionPoint == null) continue;
 
             InsnList newInstructions = new InsnList();
@@ -70,10 +70,22 @@ public final class ObfuscatorEngine {
     private static void applyDecompilerCrash(ClassNode classNode) {
         for (MethodNode method : classNode.methods) {
             if ((method.access & (Opcodes.ACC_ABSTRACT | Opcodes.ACC_NATIVE)) != 0
-                || method.instructions.size() == 0
+                || method.instructions.size() < 2
                 || method.name.startsWith("<")) {
                 continue;
             }
+
+            AbstractInsnNode insertionPoint = null;
+            ListIterator<AbstractInsnNode> iterator = method.instructions.iterator(method.instructions.size());
+            while (iterator.hasPrevious()) {
+                AbstractInsnNode instruction = iterator.previous();
+                int opcode = instruction.getOpcode();
+                if (opcode >= Opcodes.IRETURN && opcode <= Opcodes.RETURN) {
+                    insertionPoint = instruction;
+                    break;
+                }
+            }
+            if (insertionPoint == null) continue;
 
             LabelNode start = new LabelNode();
             LabelNode end = new LabelNode();
@@ -82,9 +94,6 @@ public final class ObfuscatorEngine {
 
             method.instructions.insert(start);
             method.instructions.add(end);
-
-            AbstractInsnNode handlerPoint = findSafeInsertionPoint(method);
-            if(handlerPoint == null) handlerPoint = method.instructions.get(method.instructions.size()/2);
 
             InsnList handlerCode = new InsnList();
             handlerCode.add(new JumpInsnNode(Opcodes.GOTO, jumpOverHandler));
@@ -95,12 +104,11 @@ public final class ObfuscatorEngine {
             handlerCode.add(new InsnNode(Opcodes.ATHROW));
             handlerCode.add(jumpOverHandler);
 
-            method.instructions.insert(handlerPoint, handlerCode);
+            method.instructions.insertBefore(insertionPoint, handlerCode);
 
             if (method.tryCatchBlocks == null) {
                 method.tryCatchBlocks = new ArrayList<>();
             }
-            
             method.tryCatchBlocks.add(new TryCatchBlockNode(start, end, handler, "java/lang/Throwable"));
         }
     }
@@ -108,41 +116,16 @@ public final class ObfuscatorEngine {
     private static void applyMetadataRemoval(ClassNode classNode) {
         classNode.sourceFile = null;
         classNode.sourceDebug = null;
-
         for (MethodNode method : classNode.methods) {
-            if ((method.access & (Opcodes.ACC_ABSTRACT | Opcodes.ACC_NATIVE)) != 0) {
-                continue;
-            }
-
             if (method.localVariables != null) {
                 method.localVariables.clear();
             }
-
             ListIterator<AbstractInsnNode> iterator = method.instructions.iterator();
             while (iterator.hasNext()) {
-                AbstractInsnNode instruction = iterator.next();
-                if (instruction instanceof LineNumberNode) {
+                if (iterator.next() instanceof LineNumberNode) {
                     iterator.remove();
                 }
             }
         }
-    }
-
-    private static AbstractInsnNode findSafeInsertionPoint(MethodNode method) {
-        ListIterator<AbstractInsnNode> iterator = method.instructions.iterator(method.instructions.size() / 2);
-        while (iterator.hasNext()) {
-            AbstractInsnNode node = iterator.next();
-            if (node.getOpcode() >= 0) {
-                return node;
-            }
-        }
-        iterator = method.instructions.iterator();
-        while (iterator.hasNext()) {
-            AbstractInsnNode node = iterator.next();
-            if (node.getOpcode() >= 0) {
-                return node;
-            }
-        }
-        return null;
     }
 }

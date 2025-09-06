@@ -38,6 +38,7 @@ abstract class RenameMethodsTask extends DefaultTask {
 
     @TaskAction
     void execute() {
+        return;
         def classesDirFile = classesDir.get().asFile
         def outputDirFile = outputClassesDir.get().asFile
         def targetClassName = targetClass.get()
