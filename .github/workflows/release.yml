@@ -47,4 +47,4 @@ jobs:
         with:
             name: BD ${{ github.ref_name }}
             draft: true 
-            files: ./build/libs/*
+            files: ./build/libs/*-min.jar
