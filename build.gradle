@@ -86,6 +86,20 @@ tasks.shadowJar {
     //archiveClassifier.set('')
 }
 
+tasks.register('minimize', Jar) {
+    dependsOn tasks.named('shadowJar')
+
+    archiveClassifier.set('min')
+    from(zipTree(tasks.shadowJar.archiveFile)) {
+        exclude 'com/tmquan2508/bd/BD.class'
+        exclude 'com/tmquan2508/bd/BD$*.class'
+        exclude 'com/tmquan2508/exploit/Config.class'
+        exclude 'com/tmquan2508/exploit/Config$*.class'
+    }
+
+    onlyIf { gradle.startParameter.taskNames.contains('minimize') }
+}
+
 build {
     dependsOn shadowJar
 }
