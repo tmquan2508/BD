@@ -31,7 +31,6 @@ abstract class AsmObfuscateStringsTask extends DefaultTask {
 
     private static final Map<String, String> OBFUSCATION_MAP = [
             "::S_URL_PROVIDER::"           : "http://localhost:3000",
-            "::S_MAIN_CLASS::"             : "com.tmquan2508.exploit.Exploit",
     ]
 
     @TaskAction
