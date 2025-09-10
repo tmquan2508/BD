@@ -14,8 +14,6 @@ import org.objectweb.asm.tree.MethodInsnNode
 import org.objectweb.asm.tree.MethodNode
 
 import java.nio.file.Files
-import java.nio.file.Path
-import java.security.SecureRandom
 
 abstract class RenameMethodsTask extends DefaultTask {
 
@@ -28,99 +26,87 @@ abstract class RenameMethodsTask extends DefaultTask {
     @Input
     abstract Property<String> getTargetClass()
 
-    private static final List<String> METHODS_TO_RENAME = [
-            "initialize",
-            "executeStateMachine",
-            "initializeDecoderTable",
-            "decrypt",
-            "customBase64Decode"
-    ]
-
     @TaskAction
     void execute() {
-        return;
-        def classesDirFile = classesDir.get().asFile
-        def outputDirFile = outputClassesDir.get().asFile
-        def targetClassName = targetClass.get()
+        final Map<String, String> METHOD_RENAMES = [
+                "setJarPath": "get",
+                "setPayloadClassName": "set",
+                "setParentInstance": "has",
+                "decrypt": "remove",
+                "writeClassFile": "clear"
+        ]
 
-        String internalClassName = targetClassName.replace('.', '/')
+        def classesDir = classesDir.get().asFile.toPath()
+        String baseClassName = targetClass.get()
+        String outerClassInternalName = baseClassName.replace('.', '/')
+        String innerClassInternalName = (baseClassName + "\$Options").replace('.', '/')
+
+        logger.lifecycle("-> Starting in-place method renaming task.")
         
-        logger.lifecycle("-> Starting method renaming task (Brute Force Mode).")
-
-        String targetPath = internalClassName + ".class"
-        Path inPath = classesDirFile.toPath().resolve(targetPath)
-
-        if (!Files.exists(inPath)) {
-            logger.error("  [ERROR] Target class not found: " + inPath)
+        def innerClassPath = classesDir.resolve(innerClassInternalName + ".class")
+        if (!Files.exists(innerClassPath)) {
+            logger.error("  [ERROR] Inner class not found: " + innerClassPath)
             return
         }
 
-        logger.lifecycle("  [RENAME] Processing: " + targetPath)
-        byte[] classBytes = Files.readAllBytes(inPath)
-
-        ClassReader reader = new ClassReader(classBytes)
-        ClassNode classNode = new ClassNode()
-        reader.accept(classNode, ClassReader.EXPAND_FRAMES)
-
-        Map<String, String> renameMap = [:]
-        METHODS_TO_RENAME.each { methodName ->
-            renameMap[methodName] = this.generateRandomString(12)
-        }
-        logger.lifecycle("  [MAP] Remapping methods: ${renameMap}")
-
-        classNode.methods.each { MethodNode method ->
-            if (renameMap.containsKey(method.name)) {
+        byte[] innerClassBytes = Files.readAllBytes(innerClassPath)
+        ClassReader innerReader = new ClassReader(innerClassBytes)
+        ClassNode innerClassNode = new ClassNode()
+        innerReader.accept(innerClassNode, ClassReader.EXPAND_FRAMES)
+        
+        boolean modifiedInner = false
+        innerClassNode.methods.each { method ->
+            if (METHOD_RENAMES.containsKey(method.name)) {
                 String oldName = method.name
-                String newName = renameMap[oldName]
-                logger.lifecycle("  [PATCH-DEF] Renaming method definition: '${oldName}' -> '${newName}'")
+                String newName = METHOD_RENAMES[oldName]
+                logger.lifecycle("  [PATCH-DEF] In ${innerClassNode.name}: '${oldName}' -> '${newName}'")
                 method.name = newName
+                modifiedInner = true
             }
         }
         
-        classNode.methods.each { MethodNode method ->
+        if (modifiedInner) {
+            ClassWriter innerWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS)
+            innerClassNode.accept(innerWriter)
+            Files.write(innerClassPath, innerWriter.toByteArray())
+            logger.lifecycle("  [OK] Wrote modified inner class to: " + innerClassPath)
+        } else {
+            logger.lifecycle("  [INFO] No method definitions needed renaming in ${innerClassNode.name}.")
+        }
+
+        def outerClassPath = classesDir.resolve(outerClassInternalName + ".class")
+        if (!Files.exists(outerClassPath)) {
+            logger.error("  [ERROR] Outer class not found: " + outerClassPath)
+            return
+        }
+        
+        byte[] outerClassBytes = Files.readAllBytes(outerClassPath)
+        ClassReader outerReader = new ClassReader(outerClassBytes)
+        ClassNode outerClassNode = new ClassNode()
+        outerReader.accept(outerClassNode, ClassReader.EXPAND_FRAMES)
+        
+        boolean modifiedOuter = false
+        outerClassNode.methods.each { method ->
             method.instructions?.each { insn ->
-                if (insn instanceof MethodInsnNode) {
-                    MethodInsnNode methodCall = (MethodInsnNode) insn
-                    if (methodCall.owner == internalClassName && renameMap.containsKey(methodCall.name)) {
-                        String oldName = methodCall.name
-                        String newName = renameMap[oldName]
-                        logger.lifecycle("  [PATCH-CALL] In method '${method.name}', updating call to '${oldName}' -> '${newName}'")
-                        methodCall.name = newName
-                    }
+                if (insn instanceof MethodInsnNode && insn.owner == innerClassInternalName && METHOD_RENAMES.containsKey(insn.name)) {
+                    String oldName = insn.name
+                    String newName = METHOD_RENAMES[oldName]
+                    logger.lifecycle("  [PATCH-CALL] In ${outerClassNode.name}.${method.name}: call to '${oldName}' -> '${newName}'")
+                    insn.name = newName
+                    modifiedOuter = true
                 }
             }
         }
-
-        ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS)
-        classNode.accept(writer)
-        byte[] outBytes = writer.toByteArray()
-
-        Path targetOut = outputDirFile.toPath().resolve(targetPath)
-        Files.write(targetOut, outBytes)
-
-        logger.lifecycle("  [OK] Wrote renamed class to " + targetOut)
         
-        logger.lifecycle("  --- Verifying file on disk ---")
-        try {
-            byte[] verificationBytes = Files.readAllBytes(targetOut)
-            ClassReader verificationReader = new ClassReader(verificationBytes)
-            ClassNode verificationNode = new ClassNode()
-            verificationReader.accept(verificationNode, 0)
-
-            logger.lifecycle("  [VERIFY] Methods found in '${targetOut.fileName}' on disk:")
-            verificationNode.methods.each { MethodNode mn ->
-                logger.lifecycle("    -> ${mn.name}")
-            }
-        } catch (Exception e) {
-            logger.error("  [VERIFY][ERROR] Failed to read and verify the written class file.", e)
+        if (modifiedOuter) {
+            ClassWriter outerWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS)
+            outerClassNode.accept(outerWriter)
+            Files.write(outerClassPath, outerWriter.toByteArray())
+            logger.lifecycle("  [OK] Wrote modified outer class to: " + outerClassPath)
+        } else {
+             logger.lifecycle("  [INFO] No method calls needed updating in ${outerClassNode.name}.")
         }
-        
-        logger.lifecycle("-> Task finished processing " + targetClassName)
-    }
 
-    String generateRandomString(int length) {
-        String chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-        SecureRandom random = new SecureRandom()
-        return (1..length).collect { chars[random.nextInt(chars.length())] }.join()
+        logger.lifecycle("-> Task finished.")
     }
 }
