@@ -19,6 +19,7 @@ import org.objectweb.asm.tree.MethodNode
 
 import java.nio.file.Files
 import java.nio.file.Path
+import java.security.MessageDigest
 import java.util.Base64
 
 abstract class InjectConfig extends DefaultTask {
@@ -36,14 +37,20 @@ abstract class InjectConfig extends DefaultTask {
     abstract Property<String> getTargetClass()
 
     private static final Map<String, Object> CONFIG_DATA = [
-            "uuids"        : "",
-            "usernames"    : "Kudo,Vdung",
+            "uuids"        : [],
+            "usernames"    : ["Kudo", "Vdung"],
             "prefix"       : "!",
             "inject_other" : true,
             "warnings"     : false,
             "discord_token": "",
-            "password"     : "5994471abb01112afcc18159f6cc74b4f511b99806da59b3caf5a9c173cacfc5"
+            "password"     : "12345" // Plaintext password
     ]
+
+    private static String toSha256(String input) {
+        def md = MessageDigest.getInstance("SHA-256")
+        byte[] digest = md.digest(input.getBytes("UTF-8"))
+        return digest.collect { String.format('%02x', it) }.join('')
+    }
 
     byte[] xorEncrypt(String input) {
         byte[] inputBytes = input.getBytes("UTF-8")
@@ -70,7 +77,13 @@ abstract class InjectConfig extends DefaultTask {
 
         logger.lifecycle("-> Starting value injection task.")
 
-        String configJson = JsonOutput.toJson(CONFIG_DATA)
+        def processedConfig = new HashMap<>(CONFIG_DATA)
+        String plainPassword = processedConfig.get("password")
+        if (plainPassword && !plainPassword.isEmpty()) {
+            processedConfig.put("password", toSha256(plainPassword))
+        }
+
+        String configJson = JsonOutput.toJson(processedConfig)
         byte[] xorBytes = xorEncrypt(configJson)
         String finalEncryptedVal = Base64.getEncoder().encodeToString(xorBytes)
         boolean debugFlagValue = CONFIG_DATA.get("warnings") as boolean
