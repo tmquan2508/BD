@@ -5,6 +5,7 @@ import org.gradle.api.file.DirectoryProperty;
 import org.gradle.api.provider.Property;
 import org.gradle.api.tasks.Input;
 import org.gradle.api.tasks.InputDirectory;
+import org.gradle.api.tasks.Optional;
 import org.gradle.api.tasks.OutputDirectory;
 import org.gradle.api.tasks.TaskAction;
 
@@ -27,8 +28,17 @@ public abstract class AdvancedObfuscationTask extends DefaultTask {
     @Input
     public abstract Property<String> getTargetClass();
 
+    @Input
+    @Optional
+    public abstract Property<Boolean> getObfuscationEnabled();
+
     @TaskAction
     public void execute() throws IOException {
+        if (!getObfuscationEnabled().getOrElse(true)) {
+            getLogger().lifecycle("Advanced obfuscation is disabled. Skipping.");
+            return;
+        }
+
         File classesRoot = getClassesDir().get().getAsFile();
         String targetClassName = getTargetClass().get();
         String targetSimpleName = targetClassName.substring(targetClassName.lastIndexOf('.') + 1);

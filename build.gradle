@@ -82,6 +82,7 @@ tasks.register('obfuscateAdvanced', AdvancedObfuscationTask) {
     targetClass = 'com.tmquan2508.exploit.Config'
     classesDir.set(mainClassesDir)
     outputClassesDir.set(mainClassesDir)
+    enabled = true
 }
 
 tasks.register('renameMethods', RenameMethodsTask) {
