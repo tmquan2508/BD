@@ -20,7 +20,7 @@ import java.util.Base64
 abstract class InjectConfig extends DefaultTask {
 
     private static final String SECRET_KEY = "openbd.secret.key"
-    private static final String CONFIG_BLOB_PLACEHOLDER = "::CONFIG"
+    private static final String CONFIG_BLOB_PLACEHOLDER = "::CONFIG::"
 
     @InputDirectory
     abstract DirectoryProperty getClassesDir()
