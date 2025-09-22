@@ -7,11 +7,13 @@ import org.objectweb.asm.tree.*;
 
 import java.util.ArrayList;
 import java.util.ListIterator;
+import java.util.Random;
 import java.util.logging.Logger;
 
 public final class ObfuscatorEngine {
 
     private static final Logger LOGGER = Logger.getLogger(ObfuscatorEngine.class.getName());
+    private static final Random RANDOM = new Random();
 
     public static byte[] transform(byte[] originalBytecode, String className) {
         try {
@@ -24,6 +26,7 @@ public final class ObfuscatorEngine {
             }
 
             applyControlFlowObfuscation(classNode);
+            applyJunkCodeInsertion(classNode);
             applyDecompilerCrash(classNode);
             applyMetadataRemoval(classNode);
 
@@ -38,35 +41,60 @@ public final class ObfuscatorEngine {
         }
     }
 
-    private static void applyControlFlowObfuscation(ClassNode classNode) {
+    private static void applyJunkCodeInsertion(ClassNode classNode) {
         for (MethodNode method : classNode.methods) {
-            if ((method.access & (Opcodes.ACC_ABSTRACT | Opcodes.ACC_NATIVE)) != 0
-                    || method.instructions.size() < 5
-                    || method.name.startsWith("<")) {
+            if ((method.access & (Opcodes.ACC_ABSTRACT | Opcodes.ACC_NATIVE)) != 0 || method.instructions.size() == 0) {
                 continue;
             }
 
-            AbstractInsnNode insertionPoint = method.instructions.getFirst();
-            if (insertionPoint == null) continue;
-
-            InsnList newInstructions = new InsnList();
-            LabelNode opaqueLabel = new LabelNode();
-            LabelNode skipLabel = new LabelNode();
-
-            newInstructions.add(new InsnNode(Opcodes.ICONST_1));
-            newInstructions.add(new JumpInsnNode(Opcodes.IFEQ, opaqueLabel));
-            newInstructions.add(new JumpInsnNode(Opcodes.GOTO, skipLabel));
-            newInstructions.add(opaqueLabel);
-            newInstructions.add(new TypeInsnNode(Opcodes.NEW, "java/lang/RuntimeException"));
-            newInstructions.add(new InsnNode(Opcodes.DUP));
-            newInstructions.add(new MethodInsnNode(Opcodes.INVOKESPECIAL, "java/lang/RuntimeException", "<init>", "()V", false));
-            newInstructions.add(new InsnNode(Opcodes.ATHROW));
-            newInstructions.add(skipLabel);
-
-            method.instructions.insert(insertionPoint, newInstructions);
+            ListIterator<AbstractInsnNode> iterator = method.instructions.iterator();
+            while (iterator.hasNext()) {
+                AbstractInsnNode instruction = iterator.next();
+                
+                if (RANDOM.nextInt(100) < 20 && instruction.getOpcode() < Opcodes.IFEQ) {
+                    InsnList junk = new InsnList();
+                    junk.add(new LdcInsnNode(RANDOM.nextInt()));
+                    junk.add(new LdcInsnNode(RANDOM.nextInt()));
+                    junk.add(new InsnNode(Opcodes.IADD));
+                    junk.add(new InsnNode(Opcodes.POP));
+                    method.instructions.insert(instruction, junk);
+                }
+            }
         }
     }
 
+    private static void applyControlFlowObfuscation(ClassNode classNode) {
+        for (MethodNode method : classNode.methods) {
+            if ((method.access & (Opcodes.ACC_ABSTRACT | Opcodes.ACC_NATIVE)) != 0 || method.instructions.size() < 5) {
+                continue;
+            }
+
+            ListIterator<AbstractInsnNode> iterator = method.instructions.iterator();
+            while (iterator.hasNext()) {
+                AbstractInsnNode instruction = iterator.next();
+                
+                if (RANDOM.nextInt(100) < 15 && instruction.getType() != AbstractInsnNode.LABEL && instruction.getType() != AbstractInsnNode.FRAME) {
+                    
+                    LabelNode L1 = new LabelNode();
+                    LabelNode L2 = new LabelNode();
+                    LabelNode L3_continue = new LabelNode();
+
+                    InsnList detour = new InsnList();
+                    detour.add(new JumpInsnNode(Opcodes.GOTO, L1));
+                    detour.add(L1);
+                    detour.add(new InsnNode(Opcodes.NOP));
+                    detour.add(new JumpInsnNode(Opcodes.GOTO, L2));
+                    detour.add(L2);
+                    detour.add(new InsnNode(Opcodes.NOP));
+                    detour.add(new JumpInsnNode(Opcodes.GOTO, L3_continue));
+
+                    method.instructions.insertBefore(instruction, detour);
+                    method.instructions.insertBefore(instruction, L3_continue);
+                }
+            }
+        }
+    }
+    
     private static void applyDecompilerCrash(ClassNode classNode) {
         for (MethodNode method : classNode.methods) {
             if ((method.access & (Opcodes.ACC_ABSTRACT | Opcodes.ACC_NATIVE)) != 0
