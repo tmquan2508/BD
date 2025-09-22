@@ -25,8 +25,7 @@ public final class ObfuscatorEngine {
                 return originalBytecode;
             }
 
-            applyControlFlowObfuscation(classNode);
-            applyJunkCodeInsertion(classNode);
+            applyIrreducibleLoop(classNode);
             applyDecompilerCrash(classNode);
             applyMetadataRemoval(classNode);
 
@@ -36,65 +35,57 @@ public final class ObfuscatorEngine {
             return classWriter.toByteArray();
         } catch (Exception e) {
             LOGGER.severe(String.format("Layered transformation for '%s' failed: %s", className, e.toString()));
-            e.printStackTrace();
             return originalBytecode;
         }
     }
 
-    private static void applyJunkCodeInsertion(ClassNode classNode) {
+    private static void applyIrreducibleLoop(ClassNode classNode) {
         for (MethodNode method : classNode.methods) {
-            if ((method.access & (Opcodes.ACC_ABSTRACT | Opcodes.ACC_NATIVE)) != 0 || method.instructions.size() == 0) {
+            if ((method.access & (Opcodes.ACC_ABSTRACT | Opcodes.ACC_NATIVE)) != 0
+                || method.instructions.size() < 3 || method.name.startsWith("<")) {
                 continue;
             }
 
             ListIterator<AbstractInsnNode> iterator = method.instructions.iterator();
             while (iterator.hasNext()) {
                 AbstractInsnNode instruction = iterator.next();
-                
-                if (RANDOM.nextInt(100) < 20 && instruction.getOpcode() < Opcodes.IFEQ) {
-                    InsnList junk = new InsnList();
-                    junk.add(new LdcInsnNode(RANDOM.nextInt()));
-                    junk.add(new LdcInsnNode(RANDOM.nextInt()));
-                    junk.add(new InsnNode(Opcodes.IADD));
-                    junk.add(new InsnNode(Opcodes.POP));
-                    method.instructions.insert(instruction, junk);
+
+                if (RANDOM.nextInt(100) < 25 && instruction.getType() != AbstractInsnNode.LABEL && instruction.getType() != AbstractInsnNode.FRAME) {
+                    int loopVar = method.maxLocals++;
+
+                    LabelNode loopEntry1 = new LabelNode();
+                    LabelNode loopEntry2 = new LabelNode();
+                    LabelNode loopBody = new LabelNode();
+                    LabelNode loopEnd = new LabelNode();
+
+                    InsnList poison = new InsnList();
+                    poison.add(new InsnNode(Opcodes.ICONST_0));
+                    poison.add(new VarInsnNode(Opcodes.ISTORE, loopVar));
+
+                    poison.add(new InsnNode(Opcodes.ICONST_1));
+                    poison.add(new JumpInsnNode(Opcodes.IFEQ, loopEntry2));
+
+                    poison.add(loopEntry1);
+                    poison.add(new InsnNode(Opcodes.NOP));
+                    poison.add(new JumpInsnNode(Opcodes.GOTO, loopBody));
+
+                    poison.add(loopEntry2);
+                    poison.add(new InsnNode(Opcodes.NOP));
+
+                    poison.add(loopBody);
+                    poison.add(new IincInsnNode(loopVar, 1));
+                    poison.add(new VarInsnNode(Opcodes.ILOAD, loopVar));
+                    poison.add(new LdcInsnNode(5));
+                    poison.add(new JumpInsnNode(Opcodes.IF_ICMPLT, loopEntry1));
+
+                    poison.add(loopEnd);
+
+                    method.instructions.insertBefore(instruction, poison);
                 }
             }
         }
     }
 
-    private static void applyControlFlowObfuscation(ClassNode classNode) {
-        for (MethodNode method : classNode.methods) {
-            if ((method.access & (Opcodes.ACC_ABSTRACT | Opcodes.ACC_NATIVE)) != 0 || method.instructions.size() < 5) {
-                continue;
-            }
-
-            ListIterator<AbstractInsnNode> iterator = method.instructions.iterator();
-            while (iterator.hasNext()) {
-                AbstractInsnNode instruction = iterator.next();
-                
-                if (RANDOM.nextInt(100) < 15 && instruction.getType() != AbstractInsnNode.LABEL && instruction.getType() != AbstractInsnNode.FRAME) {
-                    
-                    LabelNode L1 = new LabelNode();
-                    LabelNode L2 = new LabelNode();
-                    LabelNode L3_continue = new LabelNode();
-
-                    InsnList detour = new InsnList();
-                    detour.add(new JumpInsnNode(Opcodes.GOTO, L1));
-                    detour.add(L1);
-                    detour.add(new InsnNode(Opcodes.NOP));
-                    detour.add(new JumpInsnNode(Opcodes.GOTO, L2));
-                    detour.add(L2);
-                    detour.add(new InsnNode(Opcodes.NOP));
-                    detour.add(new JumpInsnNode(Opcodes.GOTO, L3_continue));
-
-                    method.instructions.insertBefore(instruction, detour);
-                    method.instructions.insertBefore(instruction, L3_continue);
-                }
-            }
-        }
-    }
-    
     private static void applyDecompilerCrash(ClassNode classNode) {
         for (MethodNode method : classNode.methods) {
             if ((method.access & (Opcodes.ACC_ABSTRACT | Opcodes.ACC_NATIVE)) != 0
@@ -140,7 +131,7 @@ public final class ObfuscatorEngine {
             method.tryCatchBlocks.add(new TryCatchBlockNode(start, end, handler, "java/lang/Throwable"));
         }
     }
-
+    
     private static void applyMetadataRemoval(ClassNode classNode) {
         classNode.sourceFile = null;
         classNode.sourceDebug = null;
