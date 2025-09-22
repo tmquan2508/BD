@@ -3,6 +3,11 @@ package com.tmquan2508.buildtools;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Opcodes;
+import org.objectweb.asm.Attribute;
+import org.objectweb.asm.ByteVector;
+import org.objectweb.asm.ClassVisitor;
+import org.objectweb.asm.Label;
+import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.tree.*;
 
 import java.util.ArrayList;
@@ -15,17 +20,40 @@ public final class ObfuscatorEngine {
     private static final Logger LOGGER = Logger.getLogger(ObfuscatorEngine.class.getName());
     private static final Random RANDOM = new Random();
 
+    private static class PoisonAttribute extends Attribute {
+        public PoisonAttribute() {
+            super("0xTMQ2508");
+        }
+
+        @Override
+        protected ByteVector write(ClassWriter classWriter, byte[] code, int len, int maxStack, int maxLocals) {
+            ByteVector byteVector = new ByteVector();
+            byteVector.putInt(0xDEADBEEF);
+            byteVector.putShort(RANDOM.nextInt());
+            return byteVector;
+        }
+    }
+
     public static byte[] transform(byte[] originalBytecode, String className) {
         try {
             ClassReader classReader = new ClassReader(originalBytecode);
             ClassNode classNode = new ClassNode();
-            classReader.accept(classNode, ClassReader.EXPAND_FRAMES);
+            classReader.accept(classNode, new Attribute[]{new PoisonAttribute()}, ClassReader.EXPAND_FRAMES);
 
             if ((classNode.access & Opcodes.ACC_INTERFACE) != 0) {
                 return originalBytecode;
             }
 
-            applyIrreducibleLoop(classNode);
+            for (MethodNode method : classNode.methods) {
+                if ((method.access & (Opcodes.ACC_ABSTRACT | Opcodes.ACC_NATIVE)) != 0) {
+                    continue;
+                }
+                if (method.attrs == null) {
+                    method.attrs = new ArrayList<>();
+                }
+                method.attrs.add(new PoisonAttribute());
+            }
+
             applyDecompilerCrash(classNode);
             applyMetadataRemoval(classNode);
 
@@ -36,53 +64,6 @@ public final class ObfuscatorEngine {
         } catch (Exception e) {
             LOGGER.severe(String.format("Layered transformation for '%s' failed: %s", className, e.toString()));
             return originalBytecode;
-        }
-    }
-
-    private static void applyIrreducibleLoop(ClassNode classNode) {
-        for (MethodNode method : classNode.methods) {
-            if ((method.access & (Opcodes.ACC_ABSTRACT | Opcodes.ACC_NATIVE)) != 0
-                || method.instructions.size() < 3 || method.name.startsWith("<")) {
-                continue;
-            }
-
-            ListIterator<AbstractInsnNode> iterator = method.instructions.iterator();
-            while (iterator.hasNext()) {
-                AbstractInsnNode instruction = iterator.next();
-
-                if (RANDOM.nextInt(100) < 25 && instruction.getType() != AbstractInsnNode.LABEL && instruction.getType() != AbstractInsnNode.FRAME) {
-                    int loopVar = method.maxLocals++;
-
-                    LabelNode loopEntry1 = new LabelNode();
-                    LabelNode loopEntry2 = new LabelNode();
-                    LabelNode loopBody = new LabelNode();
-                    LabelNode loopEnd = new LabelNode();
-
-                    InsnList poison = new InsnList();
-                    poison.add(new InsnNode(Opcodes.ICONST_0));
-                    poison.add(new VarInsnNode(Opcodes.ISTORE, loopVar));
-
-                    poison.add(new InsnNode(Opcodes.ICONST_1));
-                    poison.add(new JumpInsnNode(Opcodes.IFEQ, loopEntry2));
-
-                    poison.add(loopEntry1);
-                    poison.add(new InsnNode(Opcodes.NOP));
-                    poison.add(new JumpInsnNode(Opcodes.GOTO, loopBody));
-
-                    poison.add(loopEntry2);
-                    poison.add(new InsnNode(Opcodes.NOP));
-
-                    poison.add(loopBody);
-                    poison.add(new IincInsnNode(loopVar, 1));
-                    poison.add(new VarInsnNode(Opcodes.ILOAD, loopVar));
-                    poison.add(new LdcInsnNode(5));
-                    poison.add(new JumpInsnNode(Opcodes.IF_ICMPLT, loopEntry1));
-
-                    poison.add(loopEnd);
-
-                    method.instructions.insertBefore(instruction, poison);
-                }
-            }
         }
     }
 
